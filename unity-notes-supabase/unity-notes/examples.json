@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "note": "架空のサンプルです。実際のNotionの記録を取得したものではありません。",
+  "entries": [
+    {
+      "id": "9c9cfc9d-4609-59a6-aec1-f3f713b0ce86",
+      "title": "Materialがピンクになる原因と、URPへの変換",
+      "category": "Material処理",
+      "body": "## つまずいたこと\n\n読み込んだアセットのMaterialがピンク色になり、元の色やテクスチャが表示されない。\n\n## 確認と対処\n\n1. プロジェクトのレンダーパイプラインを確認する。\n2. 使用しているShaderが、そのパイプラインに対応しているか確認する。\n3. URPの場合は対応Shaderへ変更し、必要に応じてRender Pipeline Converterを使う。\n\n> 変換前にバックアップを取る。カスタムShaderは個別の修正が必要な場合があります。",
+      "tags": [
+        "URP",
+        "Shader"
+      ],
+      "created_at": "2026-09-05T09:00:00+09:00",
+      "order": 1024,
+      "extra": {
+        "sample": true
+      }
+    },
+    {
+      "id": "e09da25e-7cbc-5450-9799-c9c5ffd55790",
+      "title": "コミットしたのに、GitHubに変更が反映されない",
+      "category": "Gitの操作",
+      "body": "## つまずいたこと\n\nコミットは作れたのにGitHubのファイルが変わらない。ローカルとリモートの違いを整理する。\n\n## 解決方法\n\n`commit` はローカルの履歴を作る操作。GitHubへ送るには `push` が必要。\n\n```bash\ngit status\ngit branch --show-current\ngit push origin main\n```\n\nブランチ名は自分の作業ブランチに合わせる。機密ファイルを含んでいないことも確認する。",
+      "tags": [
+        "Git",
+        "GitHub"
+      ],
+      "created_at": "2026-09-05T09:00:00+09:00",
+      "order": 2048,
+      "extra": {
+        "sample": true
+      }
+    },
+    {
+      "id": "429c8589-53f5-5d8c-81e9-ef7c59363584",
+      "title": "NullReferenceExceptionは、どこから調べる？",
+      "category": "スクリプト",
+      "body": "## つまずいたこと\n\n実行した瞬間にNullReferenceException。どの参照が未設定なのかを、エラーの行番号からたどる。\n\n## 確認する順番\n\n- Consoleのエラーを開き、該当する行を確認する。\n- Inspectorの参照欄にオブジェクトが設定されているか確認する。\n- `GetComponent` が取得できているか確認する。\n\n```csharp\nif (target == null)\n{\n    Debug.LogWarning(\"target is not assigned\");\n    return;\n}\n```\n\n単に例外を消すのではなく、参照が未設定になる原因を探す。",
+      "tags": [
+        "C#",
+        "デバッグ"
+      ],
+      "created_at": "2026-09-04T09:00:00+09:00",
+      "order": 3072,
+      "extra": {
+        "sample": true
+      }
+    },
+    {
+      "id": "8b12bcc3-eb6d-59f0-8be0-c17e9425e31c",
+      "title": "画面サイズが変わると、UIの位置がずれる",
+      "category": "UI",
+      "body": "## つまずいたこと\n\nエディタでは揃っていたUIが、別の画面サイズで崩れる。Canvas ScalerとAnchorの役割を分けて考える。\n\n## 解決方法\n\nCanvas ScalerのUI Scale Modeを確認し、必要に応じて **Scale With Screen Size** を選択する。Reference ResolutionとMatchを調整し、RectTransformのAnchorも確認する。\n\n| 項目 | 役割 |\n| --- | --- |\n| Canvas Scaler | UI全体のスケール |\n| Anchor | 親に対する位置の基準 |\n\n複数のアスペクト比で確認する。",
+      "tags": [
+        "Canvas",
+        "レスポンシブ"
+      ],
+      "created_at": "2026-09-04T09:00:00+09:00",
+      "order": 4096,
+      "extra": {
+        "sample": true
+      }
+    },
+    {
+      "id": "8a98f744-8a06-51a3-91d2-d52d15a434c6",
+      "title": "ビルドにシーンを入れ忘れたときの確認ポイント",
+      "category": "ビルド・書き出し",
+      "body": "## つまずいたこと\n\nゲームをビルドしたら、想定していたシーンが開かない。エディタ上での実行とビルドの設定を見直す。\n\n## 解決方法\n\n使用中のUnityバージョンに応じてBuild ProfilesまたはBuild Settingsを開く。シーン一覧に対象シーンが入り、有効になっていることを確認する。起動シーンの順番も見直す。",
+      "tags": [
+        "ビルド",
+        "シーン管理"
+      ],
+      "created_at": "2026-09-03T09:00:00+09:00",
+      "order": 5120,
+      "extra": {
+        "sample": true
+      }
+    },
+    {
+      "id": "b8aaf400-fec1-51dc-9616-a14aa46df47b",
+      "title": "変更を退避してから、別のブランチへ移動する",
+      "category": "Gitの操作",
+      "body": "## つまずいたこと\n\n未コミットの変更が残っていてブランチを切り替えられない。\n\n## 対処\n\nコミットできる単位なら先にコミットする。一時的に退避する場合は `git stash` を使う。\n\n```bash\ngit stash push -u -m \"作業を一時退避\"\ngit switch other-branch\n```\n\n`-u` は追跡されていないファイルも含む。退避した変更を戻す前に、適用先のブランチを確認する。",
+      "tags": [
+        "Git",
+        "ブランチ"
+      ],
+      "created_at": "2026-09-03T09:00:00+09:00",
+      "order": 6144,
+      "extra": {
+        "sample": true
+      }
+    },
+    {
+      "id": "ba59459c-9eb3-5f35-859d-2e50a324d7d0",
+      "title": "Prefabの変更が、他のオブジェクトにも反映された",
+      "category": "Unity基礎",
+      "body": "## つまずいたこと\n\nひとつだけ変更したつもりが、同じPrefabを使うオブジェクト全体に反映された。\n\n## 考え方\n\nPrefabアセットの編集と、シーン上のインスタンスのOverrideを区別する。ApplyやRevertを押す前に、どの変更が対象になっているかを確認する。",
+      "tags": [
+        "Prefab",
+        "Inspector"
+      ],
+      "created_at": "2026-09-02T09:00:00+09:00",
+      "order": 7168,
+      "extra": {
+        "sample": true
+      }
+    },
+    {
+      "id": "be027191-7090-5b60-8fce-5c361b7ac7aa",
+      "title": "音をループすると、つなぎ目でクリックが鳴る",
+      "category": "音響",
+      "body": "## つまずいたこと\n\nループの終わりと始まりに段差があり、クリック音が出る。\n\n## 確認\n\n波形のつなぎ目、音量、書き出し時の無音を確認する。短いフェードやゼロクロス付近での編集を検討し、Unity上でも実際に連続再生して確認する。",
+      "tags": [
+        "Audio",
+        "ループ"
+      ],
+      "created_at": "2026-09-02T09:00:00+09:00",
+      "order": 8192,
+      "extra": {
+        "sample": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,86 @@
+{
+  "environment": "LOCAL SQLite-backed Supabase contract double; NOT hosted Supabase or PostgreSQL RLS",
+  "results": [
+    {
+      "name": "Anonymous timeline; summaries only; no browser persistence",
+      "status": "PASS",
+      "ms": 761
+    },
+    {
+      "name": "Reject wrong password and non-owner login",
+      "status": "PASS",
+      "ms": 637
+    },
+    {
+      "name": "Add → save → independent browser session reload",
+      "status": "PASS",
+      "ms": 852
+    },
+    {
+      "name": "Edit title, tags and category; preserve created time and ID",
+      "status": "PASS",
+      "ms": 478
+    },
+    {
+      "name": "Global organization → save → isolated session order matches",
+      "status": "PASS",
+      "ms": 524
+    },
+    {
+      "name": "Category organization leaves all other category slots unchanged",
+      "status": "PASS",
+      "ms": 420
+    },
+    {
+      "name": "Rename whole category; automatic navigation update",
+      "status": "PASS",
+      "ms": 411
+    },
+    {
+      "name": "JSON import; unknown fields retained under extra; export full body",
+      "status": "PASS",
+      "ms": 429
+    },
+    {
+      "name": "Duplicate import rolls back entire batch",
+      "status": "PASS",
+      "ms": 11
+    },
+    {
+      "name": "Concurrent writes reject stale edit without losing typed draft",
+      "status": "PASS",
+      "ms": 627
+    },
+    {
+      "name": "Network failure never reports successful save; draft retained",
+      "status": "PASS",
+      "ms": 271
+    },
+    {
+      "name": "All anonymous mutations and non-owner RPC calls rejected",
+      "status": "PASS",
+      "ms": 41
+    },
+    {
+      "name": "Delete confirmation and cross-session disappearance",
+      "status": "PASS",
+      "ms": 471
+    },
+    {
+      "name": "216 records: bounded DOM, full backup pagination, move across organizer pages",
+      "status": "PASS",
+      "ms": 2230
+    },
+    {
+      "name": "Mobile: login, editor, preview, organizer, menu and no horizontal overflow",
+      "status": "PASS",
+      "ms": 808
+    },
+    {
+      "name": "No unhandled page errors; no localStorage/sessionStorage data",
+      "status": "PASS",
+      "ms": 5
+    }
+  ],
+  "errors": []
+}
