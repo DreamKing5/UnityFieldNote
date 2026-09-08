@@ -2,7 +2,7 @@ import { rpc, login, logout, loggedIn, ready } from './api.js';
 const $ = s => document.querySelector(s);
 const el = (tag, cls, text) => { const n=document.createElement(tag); if(cls)n.className=cls; if(text!==undefined)n.textContent=text; return n; };
 const PAGE_SIZE=24, ORG_SIZE=40;
-const state={category:'',query:'',revision:0,categories:[],total:0,items:[],cursors:[null],page:0,next:null,request:0,entry:null,edit:null,editRevision:0,org:[],orgAll:[],orgRevision:0,orgPage:0,orgDirty:false,editorDirty:false,categoryRevision:0};
+const state={favoritesOnly:false,reverse:false,favoriteBusy:false,category:'',query:'',revision:0,categories:[],total:0,items:[],cursors:[null],page:0,next:null,request:0,entry:null,edit:null,editRevision:0,org:[],orgAll:[],orgRevision:0,orgPage:0,orgDirty:false,editorDirty:false,categoryRevision:0};
 const md=window.markdownit({html:false,linkify:false,breaks:true,typographer:false});
 md.renderer.rules.image=(tokens,i)=>md.utils.escapeHtml(`[画像: ${tokens[i].content}]`);
 const oldLink=md.renderer.rules.link_open || ((tokens,i,options,env,self)=>self.renderToken(tokens,i,options));
@@ -26,7 +26,7 @@ async function requestClose(d){if(d.dataset.busy==='true')return;if((d.id==='edi
 for(const d of document.querySelectorAll('dialog:not(#confirmDialog)')){d.addEventListener('cancel',e=>{e.preventDefault();requestClose(d);});d.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>requestClose(d)));}
 window.addEventListener('beforeunload',e=>{if(state.editorDirty||state.orgDirty||document.querySelector('dialog[data-busy="true"]')){e.preventDefault();e.returnValue='';}});
 function requireOwner(action){if(!ready){toast('先にconfig.jsとSupabaseの初期設定を完了してください。');return;}if(!loggedIn()){pendingAction=action;open($('#loginDialog'));return;}action();}
-function authUI(){const owner=loggedIn();$('#authButton').textContent=owner?'ログアウト':'管理者ログイン';$('#accessLabel').textContent=owner?'管理者モード':'閲覧モード';$('#deleteButton').hidden=!owner;$('#editButton').hidden=!owner;}
+function authUI(){const owner=loggedIn();$('#authButton').textContent=owner?'ログアウト':'管理者ログイン';$('#accessLabel').textContent=owner?'管理者モード':'閲覧モード';$('#deleteButton').hidden=!owner;$('#editButton').hidden=!owner;$('#favoriteButton').hidden=!owner;document.querySelectorAll('.card-favorite').forEach(b=>b.hidden=!owner);}
 window.addEventListener('authlost',()=>{authUI();toast('ログインの有効期限が切れました。再ログインしてください。');});
 $('#loginForm').addEventListener('submit',e=>{e.preventDefault();task($('#loginDialog'),async()=>{await login($('#email').value.trim(),$('#password').value);$('#password').value='';$('#loginDialog').close();authUI();toast('管理者としてログインしました');const action=pendingAction;pendingAction=null;if(action)await action();});});
 $('#authButton').onclick=()=>task(null,async()=>{if(loggedIn()){await logout();authUI();toast('ログアウトしました');}else{pendingAction=null;open($('#loginDialog'));}});
@@ -35,7 +35,8 @@ function option(value,label){const o=el('option','',label);o.value=value;return 
 function updateLibrary(info){
  state.revision=info.revision;state.categories=info.categories;state.total=info.total;
  $('#allCount').textContent=info.total;$('#statTotal').textContent=String(info.total).padStart(2,'0');
- $('#allCategory').classList.toggle('active',!state.category);
+ $('#allCategory').classList.toggle('active',!state.category&&!state.favoritesOnly);
+ $('#favoritesCategory').classList.toggle('active',state.favoritesOnly);$('#favoritesCount').textContent=info.favorites_count??0;$('#favoritesFilter').setAttribute('aria-pressed',String(state.favoritesOnly));
  const nav=$('#categoryNav');nav.replaceChildren();
  for(const c of info.categories){const b=el('button','nav-item');b.classList.toggle('active',state.category===c.name);const left=el('span');left.append(el('i','category-dot'),document.createTextNode(c.name));b.append(left,el('span','count',c.count));b.onclick=()=>setFilter(c.name);nav.append(b);}
  if(!info.categories.length)nav.append(el('p','help','記録の追加時に作成できます'));
@@ -44,38 +45,68 @@ function updateLibrary(info){
  $('#connectionDot').classList.add('online');$('#connectionText').textContent='Supabase に接続済み';
 }
 function resetPaging(){state.cursors=[null];state.page=0;state.next=null;}
+
+const starSvg='<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 2.8 5.7 6.3.9-4.6 4.5 1.1 6.3-5.6-3-5.6 3 1.1-6.3L3 9.6l6.2-.9Z"/></svg>';
+function setStar(button,value,prefix=''){
+ const on=value===true;button.innerHTML=starSvg;
+ const label=on?'お気に入りを解除':'お気に入りに追加';
+ button.setAttribute('aria-label',prefix+label);button.title=label;button.setAttribute('aria-pressed',String(on));
+ if(button.id==='favoriteButton')button.append(document.createTextNode(label));
+}
+async function toggleFavorite(id,current,revision){
+ if(state.favoriteBusy||!loggedIn())return;
+ state.favoriteBusy=true;document.querySelectorAll('.card-favorite,#favoriteButton').forEach(b=>b.disabled=true);
+ try{
+  await rpc('set_favorite',{p_id:id,p_favorite:!current,p_expected_revision:revision});
+  toast(current?'お気に入りを解除しました':'お気に入りに追加しました');
+  // Only refresh this open detail's revision after a verified successful write.
+  if($('#detailDialog').open&&state.entry?.id===id)await showDetail(id);
+  resetPaging();await loadList();
+ }catch(e){errorBox($('#detailDialog').open?$('#detailDialog'):null,e);}
+ finally{state.favoriteBusy=false;document.querySelectorAll('.card-favorite,#favoriteButton').forEach(b=>b.disabled=false);}
+}
+$('#favoriteButton').onclick=()=>{if(state.entry)return toggleFavorite(state.entry.id,state.entry.favorite,state.editRevision);};
+
 function makeCard(item){
  const card=el('button','entry-card');card.type='button';card.dataset.id=item.id;
  const top=el('div','card-top');top.append(el('span','category-pill',item.category),el('time','card-date',dateLabel(item.created_at)));top.lastChild.dateTime=item.created_at;
  const bottom=el('div','card-bottom');const tags=el('div','tags');(item.tags||[]).slice(0,4).forEach(t=>tags.append(el('span','tag','#'+t)));if(!item.tags?.length)tags.append(el('span','tag','LEARNING NOTE'));bottom.append(tags,el('span','card-arrow','↗'));
  card.append(top,el('h2','card-title',item.title),el('p','card-summary',(item.summary||'').replace(/[#*`>]/g,' ').replace(/\s+/g,' ').trim()),bottom);
- card.onclick=()=>task(null,()=>showDetail(item.id));return card;
+ card.onclick=()=>task(null,()=>showDetail(item.id));
+ const shell=el('div','entry-shell');shell.append(card);
+ const star=el('button','icon-button card-favorite');star.type='button';star.dataset.id=item.id;star.hidden=!loggedIn();setStar(star,item.favorite,`${item.title}：`);star.onclick=()=>toggleFavorite(item.id,item.favorite,state.revision);shell.append(star);
+ if(item.favorite){const badge=el('span','favorite-badge');badge.innerHTML=starSvg;badge.setAttribute('aria-label','お気に入り');badge.title='お気に入り';top.prepend(badge);}
+ return shell;
 }
 function renderCards(){
  const list=$('#timeline');list.replaceChildren();
- if(!state.items.length){const empty=el('div','empty-state');empty.append(el('div','empty-icon','▤'),el('h2','',state.query?'該当する記録がありません':'まだ記録がありません'),el('p','',state.query?'別のキーワードやジャンルを試してみてください。':'右下の＋から、最初の学びを残しましょう。'));list.append(empty);}else list.append(...state.items.map(makeCard));
+ if(!state.items.length){const empty=el('div','empty-state');empty.append(el('div','empty-icon','▤'),el('h2','',state.query?'該当する記録がありません':(state.favoritesOnly?'お気に入りの記録がありません':'まだ記録がありません')),el('p','',state.query?'別のキーワードやジャンルを試してみてください。':(state.favoritesOnly?'条件を変更するか、管理者ログイン後に記録の星を押して追加できます。':'右下の＋から、最初の学びを残しましょう。')));list.append(empty);}else list.append(...state.items.map(makeCard));
  $('#pageNumber').textContent=`${state.page+1} ページ`;$('#previousPage').disabled=state.page===0;$('#nextPage').disabled=!state.next;
 }
 async function loadList(){
- const request=++state.request;$('#listStatus').textContent='読み込み中…';$('#previousPage').disabled=true;$('#nextPage').disabled=true;
+ const request=++state.request;$('#timeline').setAttribute('aria-busy','true');$('#listStatus').textContent='読み込み中…';$('#previousPage').disabled=true;$('#nextPage').disabled=true;
  const cursor=state.cursors[state.page];
  try{
-  const data=await rpc('list_entries',{p_category:state.category||null,p_query:state.query,p_limit:PAGE_SIZE,p_after_order:cursor?.order??null,p_after_id:cursor?.id??null,p_full:false});
+  const data=await rpc('list_entries_display',{p_favorites_only:state.favoritesOnly,p_reverse:state.reverse,p_category:state.category||null,p_query:state.query,p_limit:PAGE_SIZE,p_after_order:cursor?.order??null,p_after_id:cursor?.id??null,p_full:false});
   if(request!==state.request)return;
   if(state.page>0&&data.revision!==state.revision){resetPaging();toast('データが更新されたため、先頭から表示します。');return loadList();}
   updateLibrary(data.library);state.items=data.items;state.next=data.next_cursor;
-  $('#resultCount').textContent=`${data.total} 件の記録 · 手動の表示順`;$('#listStatus').textContent='';renderCards();
+  $('#resultCount').textContent=`${data.total} 件の記録 · ${state.reverse?'保存順の逆順':'保存順'}${state.favoritesOnly?' · お気に入りのみ':''}`;$('#listStatus').textContent='';renderCards();
  }catch(e){if(request!==state.request)return;$('#listStatus').textContent='読み込めませんでした。上部の↻で再試行できます。 '+e.message;$('#connectionText').textContent='接続できません';$('#connectionDot').classList.remove('online');}
+ finally{if(request===state.request)$('#timeline').removeAttribute('aria-busy');}
 }
-async function setFilter(category){state.category=category;resetPaging();$('#pageTitle').textContent=category||'すべての記録';$('#pageTitle').append(el('span','title-dot','.'));$('.sidebar').classList.remove('open');await loadList();}
-$('#allCategory').onclick=()=>setFilter('');$('#mobileCategory').onchange=e=>setFilter(e.target.value);
+async function setFilter(category){state.category=category;resetPaging();$('#pageTitle').textContent=state.favoritesOnly?(category?`お気に入り：${category}`:'お気に入り'):(category||'すべての記録');$('#pageTitle').append(el('span','title-dot','.'));$('.sidebar').classList.remove('open');await loadList();}
+$('#allCategory').onclick=()=>{state.favoritesOnly=false;return setFilter('');};$('#mobileCategory').onchange=e=>setFilter(e.target.value);
+$('#favoritesCategory').onclick=()=>{state.favoritesOnly=true;return setFilter('');};
+$('#favoritesFilter').onclick=()=>{state.favoritesOnly=!state.favoritesOnly;return setFilter(state.category);};
+$('#displayOrder').onchange=e=>{state.reverse=e.target.value==='reverse';resetPaging();loadList();};
 let searchTimer;$('#search').oninput=e=>{clearTimeout(searchTimer);state.request++;searchTimer=setTimeout(()=>{state.query=e.target.value.trim();resetPaging();loadList();},250);};
 $('#previousPage').onclick=()=>{if(state.page>0){state.page--;loadList();window.scrollTo({top:0});}};
 $('#nextPage').onclick=()=>{if(state.next){state.cursors[++state.page]=state.next;loadList();window.scrollTo({top:0});}};
 $('#refreshButton').onclick=()=>{resetPaging();loadList();};
 $('#mobileMenu').onclick=()=>$('.sidebar').classList.toggle('open');document.addEventListener('click',e=>{if(!e.target.closest('.sidebar')&&!e.target.closest('#mobileMenu'))$('.sidebar').classList.remove('open');});
 document.addEventListener('keydown',e=>{if(e.key==='/'&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!document.querySelector('dialog[open]')&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)){e.preventDefault();$('#search').focus();}if(e.key==='Escape')$('.sidebar').classList.remove('open');});
-async function showDetail(id){const result=await rpc('get_entry',{p_id:id});if(!result.entry)throw new Error('この記録は削除されたか、見つかりません。');state.entry=result.entry;state.editRevision=result.revision;$('#detailCategory').textContent=result.entry.category;$('#detailTitle').textContent=result.entry.title;$('#detailMeta').textContent=`作成 ${dateLabel(result.entry.created_at)}　·　${(result.entry.tags||[]).map(t=>'#'+t).join('  ')}`;$('#detailBody').innerHTML=markdown(result.entry.body);authUI();open($('#detailDialog'));}
+async function showDetail(id){const result=await rpc('get_entry',{p_id:id});if(!result.entry)throw new Error('この記録は削除されたか、見つかりません。');state.entry=result.entry;state.editRevision=result.revision;$('#detailCategory').textContent=result.entry.category;$('#detailTitle').textContent=result.entry.title;$('#detailMeta').textContent=`作成 ${dateLabel(result.entry.created_at)}　·　${(result.entry.tags||[]).map(t=>'#'+t).join('  ')}`;$('#detailBody').innerHTML=markdown(result.entry.body);setStar($('#favoriteButton'),result.entry.favorite);authUI();open($('#detailDialog'));}
 function resetPreview(){$('#entryBody').required=true;$('#entryBody').hidden=false;$('#markdownPreview').hidden=true;$('#previewButton').textContent='プレビュー';}
 async function editEntry(entry=null){
  const info=await rpc('library_info');updateLibrary(info);state.editRevision=info.revision;
@@ -108,7 +139,7 @@ $('#categoryForm').onsubmit=e=>{e.preventDefault();task($('#categoryDialog'),asy
 $('#dataButton').onclick=()=>{open($('#dataDialog'));$('.sidebar').classList.remove('open');};
 $('#exportButton').onclick=()=>task($('#dataDialog'),async()=>{const data=await snapshot({full:true});const backup={schema_version:1,exported_at:new Date().toISOString(),revision:data.revision,entries:data.items};const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob),a=el('a');a.href=url;a.download=`unity-notes-${new Date().toISOString().slice(0,10)}.json`;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);toast(`${data.items.length}件を書き出しました`);});
 $('#importFile').onchange=e=>task($('#dataDialog'),async()=>{const file=e.target.files[0];if(!file)return;if(file.size>5*1024*1024)throw new Error('ファイルは5MBまでです。');$('#importText').value=await file.text();});
-function normalizeImport(parsed){const values=Array.isArray(parsed)?parsed:parsed.entries;if(!Array.isArray(values)||!values.length||values.length>500)throw new Error('1〜500件の配列を指定してください。');if(!Array.isArray(parsed)&&parsed.schema_version!==undefined&&parsed.schema_version!==1)throw new Error('未対応のバックアップ形式です。');const known=['id','title','category','body','tags','created_at','updated_at','order','extra','summary'];const ids=new Set();return values.map((value,i)=>{if(!value||typeof value!=='object'||Array.isArray(value))throw new Error(`${i+1}件目がオブジェクトではありません。`);for(const [key,max] of [['title',180],['category',60],['body',200000]])if(typeof value[key]!=='string'||!value[key].trim()||value[key].length>max)throw new Error(`${i+1}件目の${key}を確認してください。`);const id=value.id||crypto.randomUUID();if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)||ids.has(id))throw new Error('IDは重複のないUUIDにしてください。省略時は自動生成します。');ids.add(id);const tags=value.tags??[];if(!Array.isArray(tags)||tags.length>30||tags.some(t=>typeof t!=='string'||!t.trim()||t.length>60))throw new Error(`${i+1}件目のtagsを確認してください。`);const created=value.created_at||new Date().toISOString();if(!Number.isFinite(Date.parse(created)))throw new Error('created_atの日時形式を確認してください。');if(value.order!==undefined&&!Number.isSafeInteger(value.order))throw new Error('orderは安全な整数で指定してください。');if(value.extra!==undefined&&(!value.extra||typeof value.extra!=='object'||Array.isArray(value.extra)))throw new Error('extraはオブジェクトで指定してください。');const extra={...(value.extra||{})};for(const [k,v] of Object.entries(value))if(!known.includes(k))Object.defineProperty(extra,k,{value:v,enumerable:true,writable:true,configurable:true});return {id,title:value.title.trim(),category:value.category.trim(),body:value.body,tags:[...new Set(tags.map(t=>t.trim()))],created_at:new Date(created).toISOString(),order:value.order??i,extra};}).sort((a,b)=>a.order-b.order);}
+function normalizeImport(parsed){const values=Array.isArray(parsed)?parsed:parsed.entries;if(!Array.isArray(values)||!values.length||values.length>500)throw new Error('1〜500件の配列を指定してください。');if(!Array.isArray(parsed)&&parsed.schema_version!==undefined&&parsed.schema_version!==1)throw new Error('未対応のバックアップ形式です。');const known=['id','title','category','body','tags','created_at','updated_at','order','extra','summary','favorite'];const ids=new Set();return values.map((value,i)=>{if(!value||typeof value!=='object'||Array.isArray(value))throw new Error(`${i+1}件目がオブジェクトではありません。`);for(const [key,max] of [['title',180],['category',60],['body',200000]])if(typeof value[key]!=='string'||!value[key].trim()||value[key].length>max)throw new Error(`${i+1}件目の${key}を確認してください。`);const id=value.id||crypto.randomUUID();if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)||ids.has(id))throw new Error('IDは重複のないUUIDにしてください。省略時は自動生成します。');ids.add(id);const tags=value.tags??[];if(!Array.isArray(tags)||tags.length>30||tags.some(t=>typeof t!=='string'||!t.trim()||t.length>60))throw new Error(`${i+1}件目のtagsを確認してください。`);const created=value.created_at||new Date().toISOString();if(!Number.isFinite(Date.parse(created)))throw new Error('created_atの日時形式を確認してください。');if(value.order!==undefined&&!Number.isSafeInteger(value.order))throw new Error('orderは安全な整数で指定してください。');if(value.extra!==undefined&&(!value.extra||typeof value.extra!=='object'||Array.isArray(value.extra)))throw new Error('extraはオブジェクトで指定してください。');if(value.favorite!==undefined&&typeof value.favorite!=='boolean')throw new Error('favoriteはtrueまたはfalseにしてください。');const extra={...(value.extra||{})};for(const [k,v] of Object.entries(value))if(!known.includes(k))Object.defineProperty(extra,k,{value:v,enumerable:true,writable:true,configurable:true});return {id,title:value.title.trim(),category:value.category.trim(),body:value.body,tags:[...new Set(tags.map(t=>t.trim()))],created_at:new Date(created).toISOString(),order:value.order??i,extra,favorite:value.favorite??false};}).sort((a,b)=>a.order-b.order);}
 $('#importButton').onclick=()=>requireOwner(()=>task($('#dataDialog'),async()=>{const text=$('#importText').value;if(new TextEncoder().encode(text).length>5*1024*1024)throw new Error('JSONは5MBまでです。');let parsed;try{parsed=JSON.parse(text);}catch{throw new Error('JSONの形式が正しくありません。');}const entries=normalizeImport(parsed);const info=await rpc('library_info');if(!await confirmAction(`${entries.length}件を追加しますか？`,'既存の記録は変更しません。全件が公開されます。同じIDがある場合は全件取り消します。'))return;await rpc('import_entries',{p_entries:entries,p_expected_revision:info.revision});$('#importText').value='';$('#importFile').value='';toast(`${entries.length}件を追加しました`);resetPaging();await loadList();}));
 authUI();
 if(ready){loadList();}else{const notice=$('#setupNotice');notice.hidden=false;notice.textContent='はじめに：Supabaseの初期設定が必要です。同梱のSETUP.mdに沿って、site/config.jsの2項目を設定してください。この画面はブラウザ内への仮保存は行いません。';$('#connectionText').textContent='Supabase 未設定';$('#resultCount').textContent='接続後に記録が表示されます';$('#listStatus').textContent='';renderCards();}
