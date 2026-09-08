@@ -12,3 +12,16 @@ dialog{background:#1a1e27;color:var(--text);border:1px solid #505b71;border-radi
 @media(max-width:760px){.card-summary{font-size:14px}.page-heading>.muted{font-size:13px}.card-title{font-size:17px}.card-date{font-size:11px}.filter-row .button{font-size:13px}#mobileCategory{font-size:13px}.save-note{font-size:12px}.help{font-size:13px}.badge{font-size:10px}}
 
 .org-grip{display:block;width:12px;height:22px;background-image:radial-gradient(circle,#a3acbd 1.2px,transparent 1.5px);background-size:6px 7px;background-position:0 0}
+
+/* v1.1: favorites are separate from tags; display order never changes stored slots. */
+.entry-shell{position:relative}.entry-shell .entry-card{padding-right:68px}.card-favorite{position:absolute;right:12px;top:12px;color:var(--muted)}
+.card-favorite[aria-pressed="true"],.favorite-action[aria-pressed="true"],.favorite-badge{color:#f4d27b}
+.card-favorite[aria-pressed="true"] svg,.favorite-action[aria-pressed="true"] svg,.favorite-badge svg{fill:currentColor}
+.favorite-badge{display:inline-flex;flex-shrink:0}.entry-shell .category-pill{margin-right:auto}
+.favorite-action{display:inline-flex;gap:8px;align-items:center;margin-right:auto}
+.view-controls{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin:4px 0 16px}
+.view-controls label{display:flex;align-items:center;gap:8px;margin:0;font-size:12px;color:var(--muted)}
+.view-controls select{margin:0;width:auto;font-size:13px;padding:8px;min-width:125px}
+.view-hint{font-size:12px;color:var(--muted)}#favoritesFilter[aria-pressed="true"]{background:#262e46;border-color:#6d7dad;color:#c3cfff}
+#timeline[aria-busy="true"] .card-favorite{pointer-events:none;opacity:.45}
+@media(max-width:760px){.entry-shell .entry-card{padding-right:52px}.card-favorite{right:4px;top:8px}.entry-shell .card-top{gap:6px;flex-wrap:wrap}.view-controls{gap:8px}.view-controls .button{font-size:13px;padding:8px}.view-hint{width:100%}.favorite-action{flex-basis:100%;justify-content:center}}
